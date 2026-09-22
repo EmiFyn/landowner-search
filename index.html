@@ -316,7 +316,7 @@ body{padding:0 0 40px}
   <div class="wrap">
     <div>
       <h1>Landowner Search</h1>
-      <div class="sub">Office consent register</div>
+      <div class="sub">Consent archive</div>
     </div>
     <button class="btn" id="settingsBtn" style="min-height:38px;padding:8px 12px">Settings</button>
   </div>
@@ -482,17 +482,37 @@ async function ownUnwrap(entry, wrapKey, uid) {
 }
 
 /* ---- the users file, kept on the device like the data ---- */
+var OWN_USERS_ERR = "";
 async function ownUsersDoc() { try { return await idbGet("owners.users"); } catch (e) { return null; } }
 async function ownFetchUsers(loud) {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return await ownUsersDoc();
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    OWN_USERS_ERR = "offline"; return await ownUsersDoc();
+  }
   try {
     var u = ownUsersUrl(); u += (u.indexOf("?") < 0 ? "?" : "&") + "t=" + Date.now();
     var r = await fetch(u, { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status);
+    if (!r.ok) throw new Error(r.status === 404 ? "the office hasn't published it yet (404)" : "the server said " + r.status);
     var doc = await r.json();
-    if (doc && doc.format === "acorn-users") { await idbSet("owners.users", doc); return doc; }
-  } catch (e) { if (loud) OWN.msg = "Couldn't check the user list just now."; }
+    if (!doc || doc.format !== "acorn-users") throw new Error("that file isn't the user list");
+    OWN_USERS_ERR = ""; await idbSet("owners.users", doc); return doc;
+  } catch (e) {
+    OWN_USERS_ERR = (e && e.message) || String(e);
+    if (loud) OWN.msg = "Couldn't check the user list just now.";
+  }
   return await ownUsersDoc();
+}
+/* why there is no user list - said plainly, because "no signal" is usually wrong
+   on a desktop and hides the real cause (opened from a folder, or not published) */
+function ownNoUsersWhy() {
+  if (typeof location !== "undefined" && location.protocol === "file:") {
+    return "This page was opened straight from a folder, and a browser won't let such a page read " +
+           "its data files. Open it from its web address instead (or serve the folder over http).";
+  }
+  if (OWN_USERS_ERR === "offline" || (typeof navigator !== "undefined" && navigator.onLine === false)) {
+    return "This device needs a signal once, to fetch the user list.";
+  }
+  return "Couldn't fetch the user list (" + OWN_USERS_FILE + " beside this page) — " +
+         (OWN_USERS_ERR || "no answer") + ".";
 }
 
 /* ---- the session on this device ---- */
@@ -505,7 +525,7 @@ async function ownSignIn(email, password) {
   email = String(email || "").trim();
   if (!email || email.indexOf("@") < 0) throw new Error("Enter the email address the office gave you.");
   var doc = await ownFetchUsers(false);
-  if (!doc) throw new Error("This phone needs a signal once, to fetch the user list.");
+  if (!doc) throw new Error(ownNoUsersWhy());
   var uid = await ownUid(email, doc.salt);
   var entry = (doc.users || []).filter(function (u) { return u.uid === uid; })[0];
   if (!entry) { await ownLogNow("sign-in refused", email, ""); throw new Error("That address isn't on the office's list."); }
@@ -925,8 +945,8 @@ function renderOwners(){
   if(OWN.state==="signin"){
     b+='<div class="card"><div class="hd"><h2>Sign in</h2></div><div class="bd">'+
        '<p class="muted">The landowner details hold people\'s names, addresses and phone numbers, so each '+
-       'user signs in with their own password. The office gives you both. It is needed once on this phone, '+
-       'with a signal; after that the search works anywhere.</p>'+
+       'user signs in with their own password. The office gives you both. It is needed once on this device, '+
+       'while it has a connection; after that the search works offline too.</p>'+
        (OWN.err? '<div class="note">'+esc(OWN.err)+'</div>' : '')+
        '<label class="fl"><span class="k">Email address</span>'+
        '<input type="email" id="ownEmail" autocomplete="username" inputmode="email" spellcheck="false" '+
@@ -952,6 +972,10 @@ function renderOwners(){
     go.onclick=run;
     pw.onkeydown=function(e){ if(e.key==="Enter") run(); };
     em.onkeydown=function(e){ if(e.key==="Enter") pw.focus(); };
+    /* say straight away when there is no user list to sign in against */
+    ownUsersDoc().then(function(d){
+      if(!d){ var el=document.getElementById("ownErr"); if(el) el.textContent=ownNoUsersWhy(); }
+    }).catch(function(){});
     setTimeout(function(){ try{ (em.value? pw:em).focus(); }catch(e){} },30);
     return;
   }

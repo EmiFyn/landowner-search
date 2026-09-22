@@ -6,7 +6,7 @@
 
    VERSION is set by build.py. Changing it is what installs a new release: the
    old cache is thrown away and the new files are taken. */
-var VERSION = "8cd72bc5";
+var VERSION = "5dd1ce75";
 var CACHE = "landowners-" + VERSION;
 
 var SHELL = ["./", "./index.html", "./manifest.webmanifest",
