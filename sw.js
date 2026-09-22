@@ -11,7 +11,7 @@
 
    VERSION is stamped by build.py. A new version installs beside the old one and
    waits: the page offers "Update now" rather than reloading under somebody. */
-var VERSION = "1.0-bcb79ebb";
+var VERSION = "1.0-8a0d2156";
 var CACHE = "landowner-search-" + VERSION;
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./leaf.svg",
              "./icon-192.png", "./icon-512.png", "./icon-512-maskable.png", "./favicon.png"];

@@ -140,7 +140,7 @@ input[type=text],input[type=password],select{width:100%;padding:12px;border:1px 
 <body>
 <header class="bar"><div class="in">
   <img src="leaf.svg" alt="">
-  <div class="t"><b>Landowner Search</b><span>Office consent register</span></div>
+  <div class="t"><b>Landowner Search</b><span>Consent archive</span></div>
   <button id="nav" type="button" aria-label="Settings"></button>
 </div></header>
 <div class="upd" id="upd" hidden><div class="in">
@@ -154,7 +154,7 @@ input[type=text],input[type=password],select{width:100%;padding:12px;border:1px 
 /* What Acorn's search expects to find around it. Each of these is Acorn's own
    helper, trimmed to what the search uses. The storage has its own name, so
    this app and Acorn never share settings even on the same github.io origin. */
-var VERSION = "1.0-bcb79ebb";
+var VERSION = "1.0-8a0d2156";
 var app = document.getElementById("app");
 var dock = document.getElementById("dock");
 var view = "owners";
@@ -214,11 +214,18 @@ function toast(msg){
 
    The search works the way the register's dashboard does: type all or part of a
    functional location, or pick a CMR to see every location in it in number
-   order (to check the spans either side), then a location to narrow it to one. */
+   order (to check the spans either side), then a location to narrow it to one.
+
+   A voltage can be chosen first (Keith, 22 Sep 2026) to cut the CMR list down to
+   the circuits at that voltage, and a CMR's locations to the ones at it. What
+   the register does not know the voltage of is never hidden — a consent shown
+   that was not needed costs a glance, one hidden that was needed costs a wasted
+   trip. Typing a location ignores the voltage: a location typed is a location
+   wanted. */
 var OWN_DEFAULT_URL = "https://raw.githubusercontent.com/EmiFyn/Acorn/main/landowners.enc";
 var OWN_CFG = LS.get("lsearch.owners", {url:OWN_DEFAULT_URL, at:0});
 var OWN = {rows:null, meta:null, state:"idle", msg:"", fetching:false,
-           q:"", cmr:"", fl:"", needKey:false, keySalt:null};
+           q:"", volt:"", cmr:"", fl:"", needKey:false, keySalt:null};
 var OWN_EVERY = 5*60*1000;      /* don't re-download more often than this */
 var OWN_SHOW  = 200;            /* results drawn at once */
 
@@ -340,16 +347,43 @@ function ownHits(){
     return words.every(function(w){ return f.indexOf(w)>=0; });
   });
   if(m===2) return OWN.rows.filter(function(r){ return r.fl===OWN.fl; });
-  if(m===3) return OWN.rows.filter(function(r){ return r.cmr===OWN.cmr; });
+  if(m===3){
+    var at={}; ownFls(OWN.cmr).forEach(function(f){ at[f]=1; });
+    return OWN.rows.filter(function(r){ return r.cmr===OWN.cmr && at[r.fl]; });
+  }
   return [];
 }
-function ownCmrs(){
-  var s={}; (OWN.rows||[]).forEach(function(r){ if(r.cmr) s[r.cmr]=1; });
-  return Object.keys(s).sort(ownCmp);
+/* Voltages as the register writes them, and as the rest of Acorn names them:
+   "11 kV", "11KV" and "11kV" are one voltage. */
+var OWN_VOLTS=["LV","11kV","33kV","132kV"];
+function ownVolt(v){
+  var k=String(v||"").trim().toUpperCase().replace(/\s+/g,"");
+  if(!k) return "";
+  for(var i=0;i<OWN_VOLTS.length;i++) if(OWN_VOLTS[i].toUpperCase()===k) return OWN_VOLTS[i];
+  return k.replace(/KV$/,"kV");
+}
+/* the voltages in the register: the usual four in their usual order, then any other */
+function ownVolts(){
+  var s={}; (OWN.rows||[]).forEach(function(r){ var v=ownVolt(r.volt); if(v) s[v]=1; });
+  var known=OWN_VOLTS.filter(function(v){ return s[v]; });
+  return known.concat(Object.keys(s).filter(function(v){ return OWN_VOLTS.indexOf(v)<0; }).sort(ownCmp));
+}
+/* group -> the voltages its consents record; kept unless those are known and none is the one chosen */
+function ownAtVolt(rows, key){
+  var g={};
+  rows.forEach(function(r){ var k=key(r), v=ownVolt(r.volt); if(!g[k]) g[k]={}; if(v) g[k][v]=1; });
+  return Object.keys(g).filter(function(k){
+    return !OWN.volt || !Object.keys(g[k]).length || g[k][OWN.volt];
+  }).sort(ownCmp);
+}
+/* every CMR, or (by default) only those at the chosen voltage */
+function ownCmrs(any){
+  var rows=(OWN.rows||[]).filter(function(r){ return r.cmr; });
+  if(any){ var s={}; rows.forEach(function(r){ s[r.cmr]=1; }); return Object.keys(s).sort(ownCmp); }
+  return ownAtVolt(rows, function(r){ return r.cmr; });
 }
 function ownFls(cmr){
-  var s={}; (OWN.rows||[]).forEach(function(r){ if(r.cmr===cmr) s[r.fl]=1; });
-  return Object.keys(s).sort(ownCmp);
+  return ownAtVolt((OWN.rows||[]).filter(function(r){ return r.cmr===cmr; }), function(r){ return r.fl; });
 }
 function ownStatus(r){
   if(!r.expiry) return "";
@@ -402,7 +436,7 @@ function ownResultsHtml(){
     var near='';
     if(m===1 && OWN.q.trim().length>=3){
       var c=OWN.q.trim().toUpperCase().split(/[\s-]+/)[0].replace(/^[A-Z]{3}R0*/,"");
-      if(ownCmrs().indexOf(c)>=0) near=' <button class="btn" data-own-cmr="'+esc(c)+'">Show all of '+esc(c)+'</button>';
+      if(ownCmrs(true).indexOf(c)>=0) near=' <button class="btn" data-own-cmr="'+esc(c)+'">Show all of '+esc(c)+'</button>';
     }
     if(m===2 && OWN.cmr) near=' <button class="btn" data-own-cmr="'+esc(OWN.cmr)+'">Show the rest of '+esc(OWN.cmr)+'</button>';
     return '<div class="note">No consents on record for that.'+near+'</div>';
@@ -410,7 +444,7 @@ function ownResultsHtml(){
   var fls={}; hits.forEach(function(r){ fls[r.fl]=1; });
   var nf=Object.keys(fls).length;
   var h='<div class="own-count">'+hits.length+' consent'+(hits.length===1?'':'s')+
-        (nf>1? ' across '+nf+' locations':'')+
+        (nf>1? ' across '+nf+' locations':'')+(m===3 && OWN.volt? ' at '+esc(OWN.volt):'')+
         (m===2 && OWN.cmr? ' · <button class="linkbtn" data-own-cmr="'+esc(OWN.cmr)+'">show all of '+esc(OWN.cmr)+'</button>':'')+
         '</div>';
   var last=null;
@@ -459,6 +493,8 @@ function renderOwners(){
     setTimeout(function(){ try{ pw.focus(); }catch(e){} },30);
     return;
   }
+  var volts=ownVolts();
+  if(OWN.volt && volts.indexOf(OWN.volt)<0) OWN.volt="";   /* gone from a newer register */
   var cmrs=ownCmrs();
   b+='<div class="card"><div class="bd">'+ownStatusLine()+'</div></div>';
   b+='<div class="card"><div class="bd">'+
@@ -466,11 +502,15 @@ function renderOwners(){
      '<input type="text" inputmode="search" id="ownQ" value="'+esc(OWN.q)+'" autocomplete="off" spellcheck="false" '+
      'placeholder="e.g. L26F 085Z or 000-062T"></label>'+
      '<div class="grid2" style="margin-top:8px">'+
-       '<label class="fl"><span class="k">or choose a CMR</span><select id="ownCmr"><option value="">Choose…</option>'+
+       (volts.length>1? '<label class="fl"><span class="k">Voltage</span><select id="ownVolt">'+
+         '<option value="">All voltages</option>'+
+         volts.map(function(v){ return '<option'+(v===OWN.volt?' selected':'')+'>'+esc(v)+'</option>'; }).join("")+
+         '</select></label>' : '')+
+       '<label class="fl"><span class="k">'+(OWN.volt? 'or choose a '+esc(OWN.volt)+' CMR' : 'or choose a CMR')+'</span><select id="ownCmr"><option value="">Choose…</option>'+
        cmrs.map(function(c){ return '<option'+(c===OWN.cmr?' selected':'')+'>'+esc(c)+'</option>'; }).join("")+
        '</select></label>'+
        '<label class="fl"><span class="k">then a functional location</span><select id="ownFl"'+(OWN.cmr?'':' disabled')+'>'+
-       '<option value="">All of '+(OWN.cmr? esc(OWN.cmr) : 'the CMR')+'</option>'+
+       '<option value="">All of '+(OWN.cmr? esc(OWN.cmr)+(OWN.volt? ' at '+esc(OWN.volt):'') : 'the CMR')+'</option>'+
        (OWN.cmr? ownFls(OWN.cmr).map(function(f){ return '<option value="'+esc(f)+'"'+(f===OWN.fl?' selected':'')+'>'+esc(f)+'</option>'; }).join("") : '')+
        '</select></label>'+
      '</div>'+
@@ -483,18 +523,29 @@ function renderOwners(){
 }
 function ownWireResults(){
   Array.prototype.forEach.call(app.querySelectorAll("[data-own-cmr]"),function(bn){
-    bn.onclick=function(){ OWN.q=""; OWN.fl=""; OWN.cmr=bn.getAttribute("data-own-cmr"); render(); window.scrollTo(0,0); };
+    bn.onclick=function(){
+      OWN.q=""; OWN.fl=""; OWN.cmr=bn.getAttribute("data-own-cmr");
+      if(ownCmrs().indexOf(OWN.cmr)<0) OWN.volt="";       /* a CMR offered is a CMR shown */
+      render(); window.scrollTo(0,0);
+    };
   });
 }
 function ownWire(){
   var rf=document.getElementById("ownRefresh");
   if(rf) rf.onclick=function(){ ownFetch(true); };
-  var q=document.getElementById("ownQ"), cm=document.getElementById("ownCmr"), fl=document.getElementById("ownFl");
+  var q=document.getElementById("ownQ"), cm=document.getElementById("ownCmr"), fl=document.getElementById("ownFl"),
+      vo=document.getElementById("ownVolt");
   var t=null;
   if(q) q.oninput=function(){
     OWN.q=q.value;
     if(OWN.q.trim() && (OWN.cmr||OWN.fl)){ OWN.cmr=""; OWN.fl=""; if(cm) cm.value=""; if(fl){ fl.innerHTML='<option value="">All of the CMR</option>'; fl.disabled=true; } }
     clearTimeout(t); t=setTimeout(function(){ var r=document.getElementById("ownRes"); if(r){ r.innerHTML=ownResultsHtml(); ownWireResults(); } },150);
+  };
+  if(vo) vo.onchange=function(){
+    OWN.volt=vo.value;
+    if(OWN.cmr && ownCmrs().indexOf(OWN.cmr)<0){ OWN.cmr=""; OWN.fl=""; }
+    else if(OWN.fl && ownFls(OWN.cmr).indexOf(OWN.fl)<0) OWN.fl="";
+    render();
   };
   if(cm) cm.onchange=function(){ OWN.cmr=cm.value; OWN.fl=""; OWN.q=""; render(); };
   if(fl) fl.onchange=function(){ OWN.fl=fl.value; OWN.q=""; render(); };
@@ -560,7 +611,7 @@ function render(){
       '<p class="muted">A stand-in for field teams until the Acorn apps are released: just the landowner '+
       'search, the same search Acorn has, working from the same office register. Install it to the home '+
       'screen and it opens with no signal.</p>'+
-      '<p class="muted">Version <b>'+esc(VERSION)+'</b> · search from Acorn 0.80</p>'+
+      '<p class="muted">Version <b>'+esc(VERSION)+'</b> · search from Acorn 0.81</p>'+
       '<div class="btnrow"><button class="btn" id="chk" type="button">Check for updates</button></div>'+
     '</div></div></div>'+
     '<p class="foot">Oakwick Utility Arborists</p>';
