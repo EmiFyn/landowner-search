@@ -1,90 +1,91 @@
-# Landowner Search — for field teams until Acorn is released
+# Putting Acorn on a phone
 
-Just the landowner search from Acorn, as an app of its own: type part of a
-functional location, or pick a CMR and then a location, and see who owns the
-land, how to reach them, and what was agreed. It works with no signal once it
-has downloaded the register.
+This folder is the whole app. It makes **no external requests at all** — no CDN,
+no font server, no lookup download — so once installed it behaves identically
+with no signal.
 
-It is **the same search as Acorn**, not a copy of it: `build.py` lifts Acorn's
-own search code out of the Acorn PWA word for word. Same passcode, same
-register, same results.
+## What it needs
 
-## Where the data comes from
+One HTTPS address. That is the only requirement, and it is not negotiable:
+browsers refuse to install an app or run a service worker over plain HTTP. The
+one exception is `http://localhost`, which is treated as secure — useful for a
+quick look on the PC, no use on a phone.
 
-Nothing changes in the office. The Consent Filer keeps publishing
-`landowners.enc` into the **Acorn** repository as it does now, and this app
-downloads it from there:
+## The quickest host: GitHub Pages (free, about five minutes)
 
-    https://raw.githubusercontent.com/EmiFyn/Acorn/main/landowners.enc
+1. Create a repository — it can be private; Pages still serves it on a paid
+   plan, or make it public if the forms carry nothing sensitive. **These files
+   carry no crew or customer data**, only the blank forms and the network
+   lookup.
+2. Upload the contents of this folder to the root of the repository — the files
+   themselves, not the folder.
+3. **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)` → Save.**
+4. Wait a minute. The address appears on that page, in the form
+   `https://<you>.github.io/<repo>/`.
 
-That works from any site because GitHub serves the file to any web page that
-asks. The address can be changed in the app's Settings if the register ever
-moves.
+Anything else that serves static files over HTTPS works just as well —
+Cloudflare Pages, Netlify, an IIS folder on the company server. There is no
+server-side code, no database and no build step.
 
-**One thing that would stop it:** if the Acorn repository is made private, that
-address stops answering. If that is ever wanted, have the Consent Filer publish
-`landowners.enc` into this repository too, and set the address in Settings to
-just `landowners.enc`.
+## Installing on Android
 
-The register is encrypted and only the team passcode opens it, which is why it
-is safe on a public host. Each phone asks for the passcode once.
+1. Open the address in **Chrome** on the phone.
+2. Wait for it to finish loading once — that is when it takes its copy.
+   The app is 8 MB, so do this on wifi.
+3. **⋮ → Add to Home screen** (Chrome may offer "Install app" itself).
+4. Open it from the home screen, not from Chrome. It runs full screen with no
+   address bar, and it is now offline-capable.
 
-## Putting it online (GitHub Pages, about five minutes)
+To prove it: turn on aeroplane mode and open it again. Everything works —
+every form, the 3,152-CMR lookup, and PDF generation.
 
-1. Create a new repository — for example `landowner-search`. Public is fine:
-   **these files carry no landowner data**, only the app. (Pages on a private
-   repository needs a paid GitHub plan.)
-2. Upload **the contents of this folder** to the root of the repository — the
-   files themselves, not the folder. Include `.nojekyll`.
-3. **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)` →
-   Save.**
-4. Wait a minute. The address appears on that page, e.g.
-   `https://emifyn.github.io/landowner-search/`. That is the link to send the
-   crews.
+## Installing on Windows
 
-It will also run from any other HTTPS host — there is no server side.
+Same address in Chrome or Edge → the install icon at the right of the address
+bar → Install. It gets a Start-menu entry and its own window.
 
-## Installing it
+## Releasing a new version
 
-**Android (Chrome):** open the link → wait for it to load once (on wifi or
-signal) → **⋮ → Add to Home screen** or **Install app** → open it from the home
-screen → enter the team passcode.
+Replace the files on the host. That is the whole of it — no reinstall, no
+sideloading, nothing for the crews to do by hand.
 
-**iPhone / iPad (Safari):** open the link → **Share → Add to Home Screen** →
-open it from the home screen → enter the passcode. Use it from the home-screen
-icon rather than a Safari tab: Safari may clear the storage of a site that
-hasn't been visited for a while, and the home-screen app is where it keeps the
-register reliably.
+They get it three ways, in order of how soon:
 
-**Windows (Edge or Chrome):** open the link → the install icon at the right of
-the address bar → Install.
+1. **They ask.** Settings has a **Version** card with a *Check for updates*
+   button. It says either "Up to date" or "Version 0.69 is available" and
+   installs it on the spot, taking a few seconds and reopening the app. Nothing
+   on the device is lost — records, photos and the chosen folder all stay.
+2. **They are told.** Next time the app opens with a signal it notices by itself
+   and says so. It does not interrupt: a sheet in progress is never reloaded
+   underneath them.
+3. **Eventually, on its own**, whenever the browser next re-checks.
 
-To prove it works offline: aeroplane mode on, open it, search.
+The version shown in Settings is the release number plus a hash of the build —
+`0.68-67bdd928`. Worth reading out when someone reports something odd, because
+it identifies the exact build they are running rather than just the number.
 
-## Keeping it current
+## What is not in this build
 
-- **The register** updates by itself whenever the phone has signal — on
-  opening, and when signal comes back — at most every five minutes. **Refresh**
-  on the search screen forces it.
-- **The app** updates when you replace the files in the repository. Phones
-  notice next time they open with signal and show **Update now** at the top;
-  it never reloads by itself mid-search. Settings → *Check for updates* asks
-  straight away.
+- **Sending email.** There is no transport yet, so sync writes to a store in the
+  browser rather than sending anything. Everything up to that point — building
+  the PDFs, filing them, composing the subject and body — is real.
+- **Filing PDFs into folders** works in Chrome on Android 132+ and on Chrome or
+  Edge on Windows. Where the browser has no folder access the Save button on the
+  finish screen still works and the settings screen says so.
 
-## Rebuilding after Acorn changes
+## Landowner Search (0.80)
 
-If the search changes in Acorn, rebuild this from the new Acorn PWA and upload
-the output:
+The Consent Archive tile is now **Landowner Search**. It reads `landowners.enc`, which the office's
+Consent Filer publishes into this same folder after every run. The file is encrypted, and each device
+asks once for the team passcode. Until the office has published it, the tile says so. Setup is
+covered in ConsentFiler\ACORN-LANDOWNER-SEARCH.md.
 
-    python3 build.py <path to Acorn's index.html> <output folder>
+## The landowner search's files
 
-It needs Python with `cairosvg` and `Pillow` (for the icons). It stops with a
-message rather than building something wrong if Acorn's search has moved in a
-way it doesn't expect.
+Consent Filer publishes two files into this folder, beside `index.html`:
 
-## When Acorn is released
+- `landowners.enc` - the consent register, encrypted.
+- `users.json` - who may sign in: a hash of each user's email address and their copy
+  of the key, locked with their own password. No addresses, names or passwords.
 
-Crews move to the Acorn app, which has the same search on its dashboard tile.
-This app can then simply be deleted from the phones; nothing in it needs
-keeping — the register comes back from the office on any device with the
-passcode.
+Both are written after every run, so neither needs editing by hand.
