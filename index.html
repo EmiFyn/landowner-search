@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2F6B33">
+<meta name="description" content="Oakwick landowner search — the office consent register, searchable with no signal.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Landowners">
+<title>Landowner Search</title>
+<!--
+  Oakwick Landowner Search — standalone, until the Acorn apps are released.
+
+  Built by build.py from the Acorn PWA. The search itself (the second script
+  below) is Acorn's own code, lifted word for word; only this shell — the
+  header, the settings screen and the update notice — is written here. Do not
+  edit the search in this file: change it in Acorn and run build.py again.
+-->
+<style>
+
+:root{
+  --paper:#ECEEE8; --surface:#F8F9F5; --surface-2:#E3E6DD; --surface-3:#D6DACE;
+  --ink:#191D18; --ink-2:#414841; --muted:#6B7269;
+  --line:#CDD2C6; --line-soft:#DDE1D7;
+  --accent:#2F6B33; --accent-ink:#235026; --accent-wash:#DEEBDD;
+  --brand:#2F6B33; --brand-2:#3E8B3B; --brand-deep:#1C4A21;
+  --ok:#2F6B33; --ok-wash:#DEEBDD; --warn:#8A6A0E; --warn-wash:#F2E9D2;
+  --risk:#A33226; --risk-wash:#F6DED9;
+  --display:"Arial Narrow","Segoe UI Semibold",Impact,system-ui,sans-serif;
+  --body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,"Roboto Mono",monospace;
+  /* what the browser draws for itself follows this, not the device */
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --paper:#131610; --surface:#1A1E18; --surface-2:#242A20; --surface-3:#2E352A;
+  --ink:#E7EAE1; --ink-2:#B4BAAE; --muted:#8B9285;
+  --line:#2F3629; --line-soft:#252B21;
+  --accent:#6BB273; --accent-ink:#95D09C; --accent-wash:#1B2A1D;
+  --brand:#6BB273; --brand-2:#4E9455; --brand-deep:#123016;
+  --ok:#6BB273; --ok-wash:#1B2A1D; --warn:#D3A94C; --warn-wash:#2B2517;
+  --risk:#E0796A; --risk-wash:#2E1B18;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#131610; --surface:#1A1E18; --surface-2:#242A20; --surface-3:#2E352A;
+  --ink:#E7EAE1; --ink-2:#B4BAAE; --muted:#8B9285;
+  --line:#2F3629; --line-soft:#252B21;
+  --accent:#6BB273; --accent-ink:#95D09C; --accent-wash:#1B2A1D;
+  --brand:#6BB273; --brand-2:#4E9455; --brand-deep:#123016;
+  --ok:#6BB273; --ok-wash:#1B2A1D; --warn:#D3A94C; --warn-wash:#2B2517;
+  --risk:#E0796A; --risk-wash:#2E1B18;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+[hidden]{display:none!important}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.06;text-transform:uppercase;letter-spacing:.01em}
+p{margin:0}
+button{font-family:inherit;font-size:inherit;cursor:pointer;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent-ink)}
+
+.bar{position:sticky;top:0;z-index:20;background:var(--brand-deep);color:#fff;
+  padding-top:env(safe-area-inset-top)}
+:root{--brand-deep:#1C4A21}
+.bar .in{max-width:760px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.bar img{width:34px;height:34px;flex:0 0 auto}
+.bar .t{flex:1 1 auto;min-width:0}
+.bar .t b{display:block;font-family:var(--display);font-size:clamp(16px,4.6vw,24px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;letter-spacing:.02em;text-transform:uppercase;line-height:1.05}
+.bar .t span{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar button{background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:2px;
+  padding:0 10px;font-size:14px;min-height:42px;min-width:42px;flex:0 0 auto;display:inline-flex;align-items:center;gap:8px}
+.bar button svg{width:22px;height:22px;flex:0 0 auto}
+/* on a phone the button is its icon, so the app's name is never cut short */
+.bar button .w{display:none}
+@media (min-width:600px){ .bar button .w{display:inline} }
+
+main{max-width:760px;margin:0 auto;padding:16px 16px calc(28px + env(safe-area-inset-bottom))}
+.stack{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line)}
+.card .hd{padding:13px 16px;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.card .hd h2{font-size:20px;font-weight:600}
+.card .bd{padding:16px;display:flex;flex-direction:column;gap:12px}
+.muted{color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:13px 18px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);font-weight:500;border-radius:2px;min-height:48px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 auto}
+input[type=text],input[type=password],select{width:100%;padding:12px;border:1px solid var(--line);
+  background:var(--paper);color:var(--ink);font-family:inherit;font-size:16px;border-radius:2px;min-height:48px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.grid2 .fl>:last-child{margin-top:auto}
+.fl{display:flex;flex-direction:column;gap:6px}
+.fl .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface);padding:13px 15px;font-size:14px;color:var(--ink-2);line-height:1.45}
+
+.upd{position:sticky;top:calc(58px + env(safe-area-inset-top));z-index:19;background:var(--accent-wash);
+  border-bottom:1px solid var(--line);color:var(--ink)}
+.upd .in{max-width:760px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;justify-content:space-between;font-size:14px}
+.upd .btn{min-height:40px;padding:8px 14px}
+.foot{margin-top:22px;text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+.own-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.own-hint{padding:4px 2px}
+.own-count{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-ink);margin:2px 2px 8px}
+.own-c{background:var(--surface);border:1px solid var(--line);padding:12px 14px;margin-bottom:8px}
+.own-c.first{margin-top:14px}
+.own-c.pick{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.own-fl{font-weight:700;font-size:15px;color:var(--accent-ink);margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;word-break:break-all}
+.own-chips{display:inline-flex;gap:6px}
+.own-chip{font-family:var(--mono);font-size:11px;padding:2px 6px;border:1px solid var(--accent);color:var(--accent-ink);font-weight:400}
+.own-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.own-name{font-size:17px;font-weight:600}
+.own-st{font-size:12px;font-weight:700;padding:2px 8px;border-radius:2px}
+.own-st.ok{background:var(--accent-wash);color:var(--accent-ink)}
+.own-st.x{background:#F5E2DD;color:#9C2A16}
+.own-dates{font-size:13px;color:var(--ink-2);margin:2px 0 8px}
+.own-l{display:grid;grid-template-columns:104px 1fr;gap:8px;font-size:14px;padding:3px 0;border-top:1px dashed var(--line)}
+.own-k{color:var(--ink-2);font-size:12.5px}
+.own-v{white-space:pre-wrap;word-break:break-word}
+.own-v a{color:var(--accent-ink);font-weight:600}
+.own-trees{margin-top:6px;font-size:13.5px}
+.own-trees summary{cursor:pointer;color:var(--accent-ink);font-weight:600;padding:4px 0}
+.own-err{color:#9C2A16;font-size:13.5px;min-height:18px;margin-top:6px}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent-ink);font:inherit;text-decoration:underline;cursor:pointer;letter-spacing:inherit;text-transform:inherit}
+
+</style>
+</head>
+<body>
+<header class="bar"><div class="in">
+  <img src="leaf.svg" alt="">
+  <div class="t"><b>Landowner Search</b><span>Office consent register</span></div>
+  <button id="nav" type="button" aria-label="Settings"></button>
+</div></header>
+<div class="upd" id="upd" hidden><div class="in">
+  <span>A new version is ready.</span>
+  <button class="btn primary" id="updGo" type="button">Update now</button>
+</div></div>
+<main id="app"></main>
+<div id="dock" hidden></div>
+
+<script>
+/* What Acorn's search expects to find around it. Each of these is Acorn's own
+   helper, trimmed to what the search uses. The storage has its own name, so
+   this app and Acorn never share settings even on the same github.io origin. */
+var VERSION = "1.0-bcb79ebb";
+var app = document.getElementById("app");
+var dock = document.getElementById("dock");
+var view = "owners";
+
+var LS = {
+  get:function(k,d){ try{ var v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+  set:function(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true;}catch(e){ return false; } }
+};
+function idbOpen(){
+  return new Promise(function(res,rej){
+    var rq=indexedDB.open("landowner.search",1);
+    rq.onupgradeneeded=function(){ rq.result.createObjectStore("kv"); };
+    rq.onsuccess=function(){ res(rq.result); };
+    rq.onerror=function(){ rej(rq.error); };
+  });
+}
+function idbGet(k){
+  return idbOpen().then(function(db){ return new Promise(function(res,rej){
+    var rq=db.transaction("kv","readonly").objectStore("kv").get(k);
+    rq.onsuccess=function(){ res(rq.result); }; rq.onerror=function(){ rej(rq.error); };
+  }); });
+}
+function idbSet(k,v){
+  return idbOpen().then(function(db){ return new Promise(function(res,rej){
+    var tx=db.transaction("kv","readwrite"); tx.objectStore("kv").put(v,k);
+    tx.oncomplete=function(){ res(true); }; tx.onerror=function(){ rej(tx.error); }; tx.onabort=function(){ rej(tx.error); };
+  }); });
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function today(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function ukDate(iso){ if(!iso) return ""; var p=String(iso).split("-"); return p.length===3? p[2]+"/"+p[1]+"/"+p[0] : iso; }
+function toast(msg){
+  var d=document.createElement("div"); d.textContent=msg;
+  d.style.cssText="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(28px + env(safe-area-inset-bottom));z-index:80;background:var(--ink);color:var(--paper);padding:11px 16px;border-radius:2px;font-size:14px;max-width:88vw;text-align:center";
+  document.body.appendChild(d); setTimeout(function(){ d.remove(); },3400);
+}
+</script>
+
+<script>
+/* ---------------- landowner search ----------------
+
+   Replaces the Consent Archive tile (Keith, 22 Sep 2026). The office's Consent
+   Filer reads every consent that comes in by email into its register and, after
+   each run, publishes one file beside this app: landowners.enc. That file is the
+   register, encrypted — it carries landowners' names, addresses and phone
+   numbers and sits on a public web host, so without the team passcode it is
+   noise.
+
+   · Downloaded whenever the app has a signal (on opening the tile, on start, and
+     when the phone comes back online), at most every few minutes.
+   · Kept on the device, still encrypted, so the search works with no signal.
+   · The passcode is typed once. What is kept is a key the browser made from it
+     and will not hand back (a non-extractable CryptoKey), so the passcode itself
+     is never stored. A new passcode in the office means a new salt in the file,
+     and the device asks again.
+
+   The search works the way the register's dashboard does: type all or part of a
+   functional location, or pick a CMR to see every location in it in number
+   order (to check the spans either side), then a location to narrow it to one. */
+var OWN_DEFAULT_URL = "https://raw.githubusercontent.com/EmiFyn/Acorn/main/landowners.enc";
+var OWN_CFG = LS.get("lsearch.owners", {url:OWN_DEFAULT_URL, at:0});
+var OWN = {rows:null, meta:null, state:"idle", msg:"", fetching:false,
+           q:"", cmr:"", fl:"", needKey:false, keySalt:null};
+var OWN_EVERY = 5*60*1000;      /* don't re-download more often than this */
+var OWN_SHOW  = 200;            /* results drawn at once */
+
+function ownUrl(){ return String(OWN_CFG.url||OWN_DEFAULT_URL).trim() || OWN_DEFAULT_URL; }
+function b64(s){ var b=atob(s), a=new Uint8Array(b.length); for(var i=0;i<b.length;i++) a[i]=b.charCodeAt(i); return a; }
+function ownNat(s){
+  return String(s||"").toUpperCase().split(/(\d+)/).map(function(p,i){ return i%2? parseInt(p,10) : p; });
+}
+function ownCmp(a,b){
+  var x=ownNat(a), y=ownNat(b);
+  for(var i=0;i<Math.max(x.length,y.length);i++){
+    if(x[i]===undefined) return -1; if(y[i]===undefined) return 1;
+    if(x[i]===y[i]) continue;
+    var nx=typeof x[i]==="number", ny=typeof y[i]==="number";
+    if(nx&&ny) return x[i]-y[i];
+    return String(x[i])<String(y[i])? -1 : 1;
+  }
+  return 0;
+}
+
+async function ownKeyFor(env, passcode){
+  var base=await crypto.subtle.importKey("raw", new TextEncoder().encode(passcode), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2", salt:b64(env.salt), iterations:env.iter|0, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+}
+async function ownOpen(env, key){
+  var pt=await crypto.subtle.decrypt({name:"AES-GCM", iv:b64(env.iv)}, key, b64(env.data));
+  var bytes=new Uint8Array(pt);
+  if(env.zip==="gzip"){
+    var ds=new DecompressionStream("gzip");
+    var out=new Response(new Blob([bytes]).stream().pipeThrough(ds));
+    return JSON.parse(await out.text());
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+/* the kept key, if it was made for this file's salt */
+async function ownStoredKey(env){
+  try{
+    var k=await idbGet("owners.key");
+    if(k && k.salt===env.salt && k.iter===env.iter) return k.key;
+  }catch(e){}
+  return null;
+}
+/* open whatever copy is on the device */
+async function ownLoadLocal(){
+  var env=null;
+  try{ env=await idbGet("owners.enc"); }catch(e){}
+  if(!env){ OWN.state="empty"; return false; }
+  OWN.meta={updated:env.updated, count:env.count};
+  var key=await ownStoredKey(env);
+  if(!key){ OWN.needKey=true; OWN.keySalt=env.salt; OWN.state="locked"; return false; }
+  try{
+    var body=await ownOpen(env,key);
+    OWN.rows=ownIndex(body.records||[]); OWN.needKey=false; OWN.state="ready";
+    return true;
+  }catch(e){
+    OWN.needKey=true; OWN.state="locked"; return false;
+  }
+}
+function ownIndex(rows){
+  rows.sort(function(a,b){
+    var c=ownCmp(a.fl,b.fl); if(c) return c;
+    return String(b.date||"")<String(a.date||"")? -1 : String(b.date||"")>String(a.date||"")? 1 : 0;
+  });
+  return rows;
+}
+/* fetch a newer copy; quiet unless asked */
+async function ownFetch(loud){
+  if(OWN.fetching) return;
+  if(!loud && OWN_CFG.at && Date.now()-OWN_CFG.at < OWN_EVERY) return;
+  if(typeof navigator!=="undefined" && navigator.onLine===false){
+    if(loud){ OWN.msg="No signal — showing the copy on this device."; ownRedraw(); }
+    return;
+  }
+  OWN.fetching=true; if(loud){ OWN.msg="Checking for new consents…"; ownRedraw(); }
+  try{
+    var u=ownUrl(); u+=(u.indexOf("?")<0?"?":"&")+"t="+Date.now();
+    var r=await fetch(u,{cache:"no-store"});
+    if(!r.ok) throw new Error(r.status===404? "the office hasn't published the data yet" : "the server said "+r.status);
+    var env=await r.json();
+    if(env.format!=="acorn-landowners") throw new Error("that file isn't landowner data");
+    var had=null; try{ had=await idbGet("owners.enc"); }catch(e){}
+    await idbSet("owners.enc", env);
+    OWN_CFG.at=Date.now(); LS.set("lsearch.owners", OWN_CFG);
+    var changed=!had || had.updated!==env.updated;
+    if(changed || !OWN.rows) await ownLoadLocal();
+    OWN.msg = changed? "Updated — "+env.count+" consents." : "Up to date.";
+  }catch(e){
+    OWN.msg="Couldn't download the latest ("+(e && e.message || e)+"). "+
+            (OWN.rows? "Showing the copy on this device." : "");
+  }finally{
+    OWN.fetching=false; ownRedraw();
+  }
+}
+async function ownUnlock(passcode){
+  var env=null; try{ env=await idbGet("owners.enc"); }catch(e){}
+  if(!env) throw new Error("Nothing downloaded yet — this needs a signal once.");
+  var key=await ownKeyFor(env, passcode);
+  var body;
+  try{ body=await ownOpen(env,key); }
+  catch(e){ throw new Error("That passcode doesn't open it."); }
+  await idbSet("owners.key", {key:key, salt:env.salt, iter:env.iter});
+  OWN.rows=ownIndex(body.records||[]); OWN.needKey=false; OWN.state="ready";
+  OWN.meta={updated:env.updated, count:env.count};
+}
+async function ownForget(){
+  try{ await idbSet("owners.key", null); await idbSet("owners.enc", null); }catch(e){}
+  OWN.rows=null; OWN.meta=null; OWN.state="empty"; OWN_CFG.at=0; LS.set("lsearch.owners", OWN_CFG);
+}
+
+/* ---- search, the register's rules ---- */
+function ownMode(){ return OWN.q.trim()? 1 : OWN.fl? 2 : OWN.cmr? 3 : 0; }
+function ownHits(){
+  if(!OWN.rows) return [];
+  /* every word typed must appear, so "L26F 085Z" finds EPN-R00000000L26F-000-085Z */
+  var m=ownMode(), words=OWN.q.trim().toUpperCase().split(/[\s,]+/).filter(Boolean);
+  if(m===1) return OWN.rows.filter(function(r){
+    var f=String(r.fl||"").toUpperCase();
+    return words.every(function(w){ return f.indexOf(w)>=0; });
+  });
+  if(m===2) return OWN.rows.filter(function(r){ return r.fl===OWN.fl; });
+  if(m===3) return OWN.rows.filter(function(r){ return r.cmr===OWN.cmr; });
+  return [];
+}
+function ownCmrs(){
+  var s={}; (OWN.rows||[]).forEach(function(r){ if(r.cmr) s[r.cmr]=1; });
+  return Object.keys(s).sort(ownCmp);
+}
+function ownFls(cmr){
+  var s={}; (OWN.rows||[]).forEach(function(r){ if(r.cmr===cmr) s[r.fl]=1; });
+  return Object.keys(s).sort(ownCmp);
+}
+function ownStatus(r){
+  if(!r.expiry) return "";
+  return r.expiry < today() ? "Expired" : "Current";
+}
+function ownWhen(iso){
+  if(!iso) return "";
+  var d=new Date(iso); if(isNaN(d)) return iso;
+  return ukDate(iso.slice(0,10))+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+}
+function ownTel(v){ return String(v||"").replace(/[^\d+]/g,""); }
+
+function ownCard(r, first){
+  var st=ownStatus(r);
+  var line=function(k,v,html){ return v? '<div class="own-l"><span class="own-k">'+k+'</span><span class="own-v">'+(html||esc(v))+'</span></div>' : ''; };
+  var w3=String(r.w3w||"").replace(/^\/+/,"");
+  var w3ok=/^[a-z]+\.[a-z]+\.[a-z]+$/i.test(w3);
+  return '<div class="own-c'+(first?' first':'')+(OWN.fl&&r.fl===OWN.fl&&ownMode()!==2?' pick':'')+'">'+
+    (first? '<div class="own-fl">'+esc(r.fl)+'<span class="own-chips">'+
+       (r.volt? '<span class="own-chip">'+esc(r.volt)+'</span>':'')+
+       (r.cmr? '<span class="own-chip">'+esc(r.cmr)+'</span>':'')+'</span></div>' : '')+
+    '<div class="own-top"><span class="own-name">'+esc(r.name||"Landowner not recorded")+'</span>'+
+      (st? '<span class="own-st '+(st==="Expired"?'x':'ok')+'">'+st+'</span>':'')+'</div>'+
+    '<div class="own-dates">Signed '+(r.date? esc(ukDate(r.date)) : '—')+
+      (r.expiry? ' · expires '+esc(ukDate(r.expiry)) : '')+'</div>'+
+    line("Address", r.address)+
+    line("Phone", r.phone, r.phone? '<a href="tel:'+esc(ownTel(r.phone))+'">'+esc(r.phone)+'</a>':'')+
+    line("Email", r.email, r.email? '<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>':'')+
+    line("Site", r.site)+
+    line("what3words", r.w3w, w3ok? '<a href="https://what3words.com/'+esc(w3)+'" target="_blank" rel="noopener">///'+esc(w3)+'</a>' : '')+
+    line("Access", r.access)+
+    line("Arrangements", r.arrange)+
+    line("Poles", [r.pole, r.prev].filter(Boolean).join(" – "))+
+    line("Notice", r.notice)+
+    line("Shutdown", r.shutdown)+
+    line("Arisings", r.arisings)+
+    (r.trees? '<details class="own-trees"><summary>Tree schedule</summary><div>'+
+       esc(r.trees).split("; ").join("<br>")+'</div></details>' : '')+
+    line("Surveyor", r.surveyor? r.surveyor+(r.surveyorPhone? " · "+r.surveyorPhone:"") : "")+
+  '</div>';
+}
+
+function ownResultsHtml(){
+  if(!OWN.rows) return "";
+  var m=ownMode();
+  if(!m) return '<p class="muted own-hint">Type part of a functional location — <b>085Z</b> or '+
+    '<b>L26F-000-085</b> — or choose a CMR.</p>';
+  var hits=ownHits();
+  if(!hits.length){
+    var near='';
+    if(m===1 && OWN.q.trim().length>=3){
+      var c=OWN.q.trim().toUpperCase().split(/[\s-]+/)[0].replace(/^[A-Z]{3}R0*/,"");
+      if(ownCmrs().indexOf(c)>=0) near=' <button class="btn" data-own-cmr="'+esc(c)+'">Show all of '+esc(c)+'</button>';
+    }
+    if(m===2 && OWN.cmr) near=' <button class="btn" data-own-cmr="'+esc(OWN.cmr)+'">Show the rest of '+esc(OWN.cmr)+'</button>';
+    return '<div class="note">No consents on record for that.'+near+'</div>';
+  }
+  var fls={}; hits.forEach(function(r){ fls[r.fl]=1; });
+  var nf=Object.keys(fls).length;
+  var h='<div class="own-count">'+hits.length+' consent'+(hits.length===1?'':'s')+
+        (nf>1? ' across '+nf+' locations':'')+
+        (m===2 && OWN.cmr? ' · <button class="linkbtn" data-own-cmr="'+esc(OWN.cmr)+'">show all of '+esc(OWN.cmr)+'</button>':'')+
+        '</div>';
+  var last=null;
+  hits.slice(0,OWN_SHOW).forEach(function(r){ h+=ownCard(r, r.fl!==last); last=r.fl; });
+  if(hits.length>OWN_SHOW) h+='<div class="note">Showing the first '+OWN_SHOW+' — narrow the search to see the rest.</div>';
+  return h;
+}
+
+function ownStatusLine(){
+  var m=OWN.meta;
+  var s = m? 'Office copy of '+esc(ownWhen(m.updated))+' · '+(m.count||0)+' consents' : 'Not downloaded yet';
+  return '<div class="own-bar"><span>'+s+(OWN.msg? '<br><span class="muted">'+esc(OWN.msg)+'</span>':'')+'</span>'+
+         '<button class="btn" id="ownRefresh"'+(OWN.fetching?' disabled':'')+'>'+
+         (OWN.fetching? 'Checking…' : 'Refresh')+'</button></div>';
+}
+
+function renderOwners(){
+  dock.classList.add("hide");
+  var b='<div class="stack">';
+  if(!OWN.rows && OWN.state!=="locked"){
+    b+='<div class="card"><div class="bd">'+ownStatusLine()+
+       '<p class="muted" style="margin-top:10px">The landowner details come from the office\'s consent register. '+
+       'This device needs a signal once to fetch them; after that they are searchable anywhere.</p></div></div>';
+    app.innerHTML=b+'</div>';
+    ownWire();
+    if(OWN.state==="idle"){ OWN.state="loading"; ownLoadLocal().then(function(){ ownRedraw(); ownFetch(false); }); }
+    return;
+  }
+  if(OWN.state==="locked"){
+    b+='<div class="card"><div class="hd"><h2>Enter the team passcode</h2></div><div class="bd">'+
+       '<p class="muted">The landowner details are locked because they hold people\'s names, addresses and phone '+
+       'numbers. Ask the office for the passcode — it is needed once on this device, and again only if the '+
+       'office changes it.</p>'+
+       '<label class="fl"><span class="k">Passcode</span><input type="password" id="ownPass" autocomplete="off"></label>'+
+       '<div class="own-err" id="ownErr"></div>'+
+       '<div class="btnrow" style="margin-top:12px"><button class="btn primary wide" id="ownUnlock">Unlock</button></div>'+
+       '</div></div>';
+    app.innerHTML=b+'</div>';
+    var go=document.getElementById("ownUnlock"), pw=document.getElementById("ownPass");
+    var run=async function(){
+      go.disabled=true; go.textContent="Opening…";
+      try{ await ownUnlock(pw.value); render(); }
+      catch(e){ document.getElementById("ownErr").textContent=e.message||String(e); go.disabled=false; go.textContent="Unlock"; }
+    };
+    go.onclick=run; pw.onkeydown=function(e){ if(e.key==="Enter") run(); };
+    setTimeout(function(){ try{ pw.focus(); }catch(e){} },30);
+    return;
+  }
+  var cmrs=ownCmrs();
+  b+='<div class="card"><div class="bd">'+ownStatusLine()+'</div></div>';
+  b+='<div class="card"><div class="bd">'+
+     '<label class="fl"><span class="k">Search functional location</span>'+
+     '<input type="text" inputmode="search" id="ownQ" value="'+esc(OWN.q)+'" autocomplete="off" spellcheck="false" '+
+     'placeholder="e.g. L26F 085Z or 000-062T"></label>'+
+     '<div class="grid2" style="margin-top:8px">'+
+       '<label class="fl"><span class="k">or choose a CMR</span><select id="ownCmr"><option value="">Choose…</option>'+
+       cmrs.map(function(c){ return '<option'+(c===OWN.cmr?' selected':'')+'>'+esc(c)+'</option>'; }).join("")+
+       '</select></label>'+
+       '<label class="fl"><span class="k">then a functional location</span><select id="ownFl"'+(OWN.cmr?'':' disabled')+'>'+
+       '<option value="">All of '+(OWN.cmr? esc(OWN.cmr) : 'the CMR')+'</option>'+
+       (OWN.cmr? ownFls(OWN.cmr).map(function(f){ return '<option value="'+esc(f)+'"'+(f===OWN.fl?' selected':'')+'>'+esc(f)+'</option>'; }).join("") : '')+
+       '</select></label>'+
+     '</div>'+
+     '<div class="btnrow" style="margin-top:10px"><button class="btn wide" id="ownClear">Clear search</button></div>'+
+     '</div></div>';
+  b+='<div id="ownRes">'+ownResultsHtml()+'</div>';
+  app.innerHTML=b+'</div>';
+  ownWire();
+  ownFetch(false);
+}
+function ownWireResults(){
+  Array.prototype.forEach.call(app.querySelectorAll("[data-own-cmr]"),function(bn){
+    bn.onclick=function(){ OWN.q=""; OWN.fl=""; OWN.cmr=bn.getAttribute("data-own-cmr"); render(); window.scrollTo(0,0); };
+  });
+}
+function ownWire(){
+  var rf=document.getElementById("ownRefresh");
+  if(rf) rf.onclick=function(){ ownFetch(true); };
+  var q=document.getElementById("ownQ"), cm=document.getElementById("ownCmr"), fl=document.getElementById("ownFl");
+  var t=null;
+  if(q) q.oninput=function(){
+    OWN.q=q.value;
+    if(OWN.q.trim() && (OWN.cmr||OWN.fl)){ OWN.cmr=""; OWN.fl=""; if(cm) cm.value=""; if(fl){ fl.innerHTML='<option value="">All of the CMR</option>'; fl.disabled=true; } }
+    clearTimeout(t); t=setTimeout(function(){ var r=document.getElementById("ownRes"); if(r){ r.innerHTML=ownResultsHtml(); ownWireResults(); } },150);
+  };
+  if(cm) cm.onchange=function(){ OWN.cmr=cm.value; OWN.fl=""; OWN.q=""; render(); };
+  if(fl) fl.onchange=function(){ OWN.fl=fl.value; OWN.q=""; render(); };
+  var cl=document.getElementById("ownClear");
+  if(cl) cl.onclick=function(){ OWN.q=""; OWN.cmr=""; OWN.fl=""; render(); try{ document.getElementById("ownQ").focus(); }catch(e){} };
+  ownWireResults();
+}
+/* redraw only if the search is what is on screen */
+function ownRedraw(){ if(view==="owners") render(); }
+function ownTileLine(){
+  var m=OWN.meta;
+  if(!m){ try{ var t=LS.get("lsearch.owners.count",0); return t? t+" consents" : ""; }catch(e){ return ""; } }
+  LS.set("lsearch.owners.count", m.count||0);
+  return (m.count||0)+" consents";
+}
+
+/* Settings: where the data comes from, and a way to lock the device again */
+function ownersCard(){
+  return '<div class="card"><div class="hd"><h2>Landowner search</h2></div><div class="bd">'+
+    '<p class="muted">Downloaded from the office whenever there is a signal and kept on this device, '+
+    'encrypted, for use with none. '+
+    (OWN.meta? 'The copy here is from '+esc(ownWhen(OWN.meta.updated))+' ('+(OWN.meta.count||0)+' consents).' : 'Nothing downloaded yet.')+
+    '</p>'+
+    '<label class="fl"><span class="k">Address of the data file</span>'+
+    '<input type="text" id="ownUrl" value="'+esc(ownUrl())+'" spellcheck="false" autocomplete="off"></label>'+
+    '<p class="muted" style="font-size:12.5px">Leave as <b>'+OWN_DEFAULT_URL+'</b> — that is where the Consent Filer publishes it.</p>'+
+    '<div class="btnrow" style="margin-top:10px"><button class="btn" id="ownSaveUrl">Save</button>'+
+    '<button class="btn" id="ownLock">Remove it from this device</button></div></div></div>';
+}
+function wireOwnersCard(){
+  var s=document.getElementById("ownSaveUrl");
+  if(s) s.onclick=function(){
+    OWN_CFG.url=document.getElementById("ownUrl").value.trim()||OWN_DEFAULT_URL; OWN_CFG.at=0;
+    LS.set("lsearch.owners",OWN_CFG); toast("Saved — it will be fetched next time there is a signal."); ownFetch(true);
+  };
+  var l=document.getElementById("ownLock");
+  if(l) l.onclick=async function(){
+    if(!window.confirm("Remove the landowner details and the passcode from this device? They come back when the passcode is entered again.")) return;
+    await ownForget(); toast("Removed from this device."); render();
+  };
+}
+
+/* start-up and signal: fetch quietly in the background */
+window.addEventListener("online", function(){ ownFetch(false); });
+setTimeout(function(){ ownLoadLocal().then(function(){ ownFetch(false); }).catch(function(){}); }, 1500);
+
+
+</script>
+
+<script>
+/* ---- the shell: two screens, and keeping itself current ---- */
+var nav = document.getElementById("nav");
+var GEAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6" fill="none" stroke="currentColor" stroke-width="3.6" stroke-dasharray="3.2 2.77"/><circle cx="12" cy="12" r="5.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>';
+var BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 7.5 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+nav.onclick = function(){ view = (view==="owners")? "settings" : "owners"; render(); window.scrollTo(0,0); };
+
+function render(){
+  nav.innerHTML = view==="owners"? GEAR+'<span class="w">Settings</span>' : BACK+'<span class="w">Back</span>';
+  nav.setAttribute("aria-label", view==="owners"? "Settings" : "Back");
+  if(view==="owners") return renderOwners();
+  app.innerHTML = '<div class="stack">'+ownersCard()+
+    '<div class="card"><div class="hd"><h2>This app</h2></div><div class="bd">'+
+      '<p class="muted">A stand-in for field teams until the Acorn apps are released: just the landowner '+
+      'search, the same search Acorn has, working from the same office register. Install it to the home '+
+      'screen and it opens with no signal.</p>'+
+      '<p class="muted">Version <b>'+esc(VERSION)+'</b> · search from Acorn 0.80</p>'+
+      '<div class="btnrow"><button class="btn" id="chk" type="button">Check for updates</button></div>'+
+    '</div></div></div>'+
+    '<p class="foot">Oakwick Utility Arborists</p>';
+  wireOwnersCard();
+  document.getElementById("chk").onclick = checkForUpdate;
+}
+
+/* Updates. A new version is noticed quietly and offered in the bar — never
+   reloaded underneath somebody half way through reading a phone number out. */
+var REG = null;
+function offer(){ document.getElementById("upd").hidden = false; }
+document.getElementById("updGo").onclick = function(){
+  var w = REG && REG.waiting;
+  if(w){ w.postMessage("skipWaiting"); } else { location.reload(); }
+};
+function watch(reg){
+  REG = reg;
+  if(reg.waiting && navigator.serviceWorker.controller) offer();
+  reg.addEventListener("updatefound", function(){
+    var w = reg.installing; if(!w) return;
+    w.addEventListener("statechange", function(){
+      if(w.state==="installed" && navigator.serviceWorker.controller) offer();
+    });
+  });
+}
+function checkForUpdate(){
+  if(!REG){ toast("Updates need the app to be opened from its web address first."); return; }
+  if(navigator.onLine===false){ toast("No signal — try again when there is one."); return; }
+  REG.update().then(function(){
+    setTimeout(function(){ if(REG.waiting || REG.installing) offer(); else toast("Up to date — version "+VERSION+"."); }, 1200);
+  }).catch(function(){ toast("Couldn't check just now."); });
+}
+if("serviceWorker" in navigator){
+  /* Reload only when an UPDATE takes over. On the very first open the worker
+     also takes control of the page, and reloading then would throw away a
+     passcode half typed on the day the app is installed. */
+  var reloaded = false, hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", function(){
+    if(!hadController){ hadController = true; return; }
+    if(reloaded) return; reloaded = true; location.reload();
+  });
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").then(watch).catch(function(){});
+  });
+}
+
+/* Ask the browser not to clear this app's storage under pressure. Installed
+   apps are usually granted it without a prompt; if it is refused nothing
+   changes, the register is simply downloaded again with the next signal. */
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+
+render();
+</script>
+</body>
+</html>
