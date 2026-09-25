@@ -455,6 +455,9 @@ function ownUsersUrl() {
   var i = u.lastIndexOf("/");
   return (i >= 0 ? u.slice(0, i + 1) : "") + OWN_USERS_FILE;
 }
+function ownUsersAbs() {
+  try { return new URL(ownUsersUrl(), location.href).href; } catch (e) { return ownUsersUrl(); }
+}
 function ownHex(buf) {
   return Array.prototype.map.call(new Uint8Array(buf), function (x) { return ("0" + x.toString(16)).slice(-2); }).join("");
 }
@@ -511,8 +514,8 @@ function ownNoUsersWhy() {
   if (OWN_USERS_ERR === "offline" || (typeof navigator !== "undefined" && navigator.onLine === false)) {
     return "This device needs a signal once, to fetch the user list.";
   }
-  return "Couldn't fetch the user list (" + OWN_USERS_FILE + " beside this page) — " +
-         (OWN_USERS_ERR || "no answer") + ".";
+  return "Couldn't fetch " + ownUsersAbs() + " — " + (OWN_USERS_ERR || "no answer") +
+         ". A file just published can take a minute or two to appear.";
 }
 
 /* ---- the session on this device ---- */
@@ -806,13 +809,20 @@ async function ownForget(){
 
 /* ---- search, the register's rules ---- */
 function ownMode(){ return OWN.q.trim()? 1 : OWN.fl? 2 : OWN.cmr? 3 : 0; }
+/* What a typed search looks at: the location, the landowner's name and their
+   address - a farm is as often known by its name as by whose it is. Every word
+   typed has to appear somewhere in those, in any order, so "L26F 085Z" finds
+   the span, "smith" finds the landowner, "john smith" and "smith john" both
+   find John Smith, and "hill farm" finds the farm. */
+function ownWordsOf(r){
+  return (String(r.fl||"")+" "+String(r.name||"")+" "+String(r.address||"")).toUpperCase();
+}
 function ownHits(){
   if(!OWN.rows) return [];
-  /* every word typed must appear, so "L26F 085Z" finds EPN-R00000000L26F-000-085Z */
   var m=ownMode(), words=OWN.q.trim().toUpperCase().split(/[\s,]+/).filter(Boolean);
   if(m===1) return OWN.rows.filter(function(r){
-    var f=String(r.fl||"").toUpperCase();
-    return words.every(function(w){ return f.indexOf(w)>=0; });
+    var hay=ownWordsOf(r);
+    return words.every(function(w){ return hay.indexOf(w)>=0; });
   });
   if(m===2) return OWN.rows.filter(function(r){ return r.fl===OWN.fl; });
   if(m===3){
@@ -899,7 +909,7 @@ function ownResultsHtml(){
   if(!OWN.rows) return "";
   var m=ownMode();
   if(!m) return '<p class="muted own-hint">Type part of a functional location — <b>085Z</b> or '+
-    '<b>L26F-000-085</b> — or choose a CMR.</p>';
+    '<b>L26F-000-085</b> — or a landowner\'s name or address, in any order. Or choose a CMR.</p>';
   var hits=ownHits();
   if(!hits.length){
     var near='';
@@ -972,9 +982,19 @@ function renderOwners(){
     go.onclick=run;
     pw.onkeydown=function(e){ if(e.key==="Enter") run(); };
     em.onkeydown=function(e){ if(e.key==="Enter") pw.focus(); };
-    /* say straight away when there is no user list to sign in against */
-    ownUsersDoc().then(function(d){
-      if(!d){ var el=document.getElementById("ownErr"); if(el) el.textContent=ownNoUsersWhy(); }
+    /* say straight away when there is no user list to sign in against, and offer
+       another go: a file just uploaded can take a minute or two to be served */
+    ownFetchUsers(false).then(function(d){
+      if(d) return;
+      var el=document.getElementById("ownErr"); if(!el) return;
+      el.innerHTML=esc(ownNoUsersWhy())+' <button class="linkbtn" id="ownRetry">Try again</button>';
+      var rt=document.getElementById("ownRetry");
+      if(rt) rt.onclick=async function(){
+        rt.textContent="Trying…"; rt.disabled=true;
+        var got=await ownFetchUsers(false);
+        if(got){ el.textContent=""; toast("User list found — sign in."); }
+        else { el.innerHTML=esc(ownNoUsersWhy())+' <button class="linkbtn" id="ownRetry">Try again</button>'; render(); }
+      };
     }).catch(function(){});
     setTimeout(function(){ try{ (em.value? pw:em).focus(); }catch(e){} },30);
     return;
@@ -1004,9 +1024,9 @@ function renderOwners(){
   var cmrs=ownCmrs();
   b+='<div class="card"><div class="bd">'+ownStatusLine()+'</div></div>';
   b+='<div class="card"><div class="bd">'+
-     '<label class="fl"><span class="k">Search functional location</span>'+
+     '<label class="fl"><span class="k">Search location, landowner or address</span>'+
      '<input type="text" inputmode="search" id="ownQ" value="'+esc(OWN.q)+'" autocomplete="off" spellcheck="false" '+
-     'placeholder="e.g. L26F 085Z or 000-062T"></label>'+
+     'placeholder="e.g. L26F 085Z, 000-062T, Smith or Hill Farm"></label>'+
      '<div class="grid2" style="margin-top:8px">'+
        (volts.length>1? '<label class="fl"><span class="k">Voltage</span><select id="ownVolt">'+
          '<option value="">All voltages</option>'+
